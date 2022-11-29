@@ -4,14 +4,14 @@ SuperMediaSlideSHow, OBS-Studio lua Automated Media Presentation System focused 
 SMSS is a lua script that drives the OBS-Studio Image and or Media source to deliver a well featured Multi-Media Slide Show like presentation. Media files are loaded from folders on your system and there is little limit to their number (thousands ought be no problem).
 
 Features:
-• Shows Images - The simple most obvious core of a slide-show.  Any of the image types supported by the OBS-Studio Image source can be used and an Image view duration time is user selected.
-• Plays Videos - Just like showing pictures, Videos play but they play for the duration of the Video while Pictures show for a designated time period. Any of the media types supported by the OBS-Studio Media source can be used although Video/Visual types are the most logical. 
-• Managed Background Audio. A Background Audio source volume can be faded by percent while Videos are shown. Volume is transitioned back to normal when Video(s) complete. 
-• Near unlimited Media files possible. Media files are loaded between source deactivation's / activation's. Original design intent was to support thousands. 
-• Multi-Scene work-flow like capabilities. Each Media File Collection entry is associated with a Scene and each one can optionally define a Next-Scene. This enables the creation of an automated switching from scene to scene for as many entries as defined. 
-• Co-exists with OBS-Studio configured Show/Hide transitions. Image visibility duration takes into consideration Image Source show/hide transition times. 
-• Optionally shows each full/partial file specification in a Text source during a show. 
-• Capable of Starting and Stopping Recording Automatically.  This feature also acts to Fade the optional Background Audio source in at recording start and fade it out at recording end.
+* Shows Images - The simple most obvious core of a slide-show.  Any of the image types supported by the OBS-Studio Image source can be used and an Image view duration time is user selected.
+* Plays Videos - Just like showing pictures, Videos play but they play for the duration of the Video while Pictures show for a designated time period. Any of the media types supported by the OBS-Studio Media source can be used although Video/Visual types are the most logical. 
+* Managed Background Audio. A Background Audio source volume can be faded by percent while Videos are shown. Volume is transitioned back to normal when Video(s) complete.
+* Near unlimited Media files possible. Media files are loaded between source deactivation's / activation's. Original design intent was to support thousands.
+* Multi-Scene work-flow like capabilities. Each Media File Collection entry is associated with a Scene and each one can optionally define a Next-Scene. This enables the creation of an automated switching from scene to scene for as many entries as defined.
+* Co-exists with OBS-Studio configured Show/Hide transitions. Image visibility duration takes into consideration Image Source show/hide transition times. 
+* Optionally shows each full/partial file specification in a Text source during a show. 
+* Capable of Starting and Stopping Recording Automatically.  This feature also acts to Fade the optional Background Audio source in at recording start and fade it out at recording end.
 
 All this and more. This script was developed for Linux and tested on Windows. Aside from platform specifics, it works identically on either. MacOS is expected to just work.
 
