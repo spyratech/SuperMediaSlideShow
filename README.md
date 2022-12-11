@@ -11,7 +11,7 @@ Features:
 * Multi-Scene work-flow like capabilities. Each Media File Collection entry is associated with a Scene and each one can optionally define a Next-Scene. This enables the creation of an automated switching from scene to scene for as many entries as defined.
 * Co-exists with OBS-Studio configured Show/Hide transitions. Image visibility duration takes into consideration Image Source show/hide transition times. 
 * Optionally shows each full/partial file specification in a Text source during a show. 
-* Capable of Starting and Stopping Recording Automatically.  This feature also acts to Fade the optional Background Audio source in at recording start and fade it out at recording end.
+* Capable of Starting and Stopping Recording Automatically.  This feature also acts to Fade the optional Background Audio source in at recording start and fade out at recording end.
 
 All this and more. This script was developed for Linux and tested on Windows. Aside from platform specifics, it works identically on either. MacOS is expected to just work.
 

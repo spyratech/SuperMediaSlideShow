@@ -1,9 +1,12 @@
 --
 --	SuperMediaSlideShow.lua
 --
---	Author: keith.schneider@spyratech.com - September, 2022
+--	Author: keith.schneider at spyratech dot com - September, 2022
 --
 --	Modification History:
+--	11-Dec-2022 Add support for Flags in ScenesList to allow Scene specific settings
+--              drop ! use on Media Command as replaced by Flags. Fix spellings and
+--              events function (although still unused).  Bump Version to 1.7
 --
 --	-----------------------------------------------------------------------------------
 --	
@@ -12,10 +15,10 @@
 --	Copyright (c) 2022 SpyraTech International LLC
 --	An unpublished work.
 --
---	This software is licensed under the terms of the:
+--	This software and its documentation is licensed under the terms of the:
 --
 --		GNU GENERAL PUBLIC LICENSE
---		 Version 3, 29 June 200
+--		 Version 3, 29 June 2007
 --
 --	The text of this license accompanies this software and is implicitly
 --	incorporated into the body of this source code.
@@ -120,7 +123,7 @@ bit = require("bit")
 --
 gbl_settings          = nil
 gbl_scriptTitle       = "SuperMediaSlideShow"
-gbl_scriptVersion     = "1.6"
+gbl_scriptVersion     = "1.7"
 gbl_activatedState    = false
 gbl_TickSeconds       = 0
 gbl_LoopCount         = 0
@@ -175,7 +178,7 @@ prmBgAudioFadeTime   = 1000
 prmPicDelayPeriod    = 3000
 prmFolderTrimLevel   = 0		-- trims n folders off text displayed path
 prmFolderTrimOnLeft  = true		-- True=trims N elems on left, False=retain N elems left of filename
-prmRandomizeShow     = true
+prmRandomizeShow     = false
 prmMediaMonPeriod    = 1000
 -- cannot make a local file URL link work in the Scripts settings description.
 prmUserGuidePdfFile  = script_path().."SuperMediaSlideShow.pdf"
@@ -507,8 +510,7 @@ end
 --	available to OBS lua scripts.  Function uses lua os.setlocale function to get
 --	ctype catagory of locale and works from there.  Hope it works for other languages.
 --	Typically, LANG in US would look like en_US.UTF-8.. Thing is, that the ini file
---	I am using is not exactly standard compliant.  loo, It was Never a standard anyway.
---	But it seems to work.  The OBS Team needs to fix this sometime.
+--	I am using is not exactly standard compliant.  lol, It was Never a standard anyway.
 --
 --	Further frustration - at this time anyway :-)  OBS is not influenced by a LANG env
 --	and I am not sure how to get the lua os.setlocale to pick up the locale, so until
@@ -522,8 +524,8 @@ end
 --	properly at some time.  So I have externalized ALL properties text stuff but yet
 --	cannot yet properly load and carry the non english data strings around for usage.
 --	Until another time, this remains English only.  But close... More work to do.
---	Now I see OBS helkper calls that probably enable this to work - well, dunno if
---	anyone will want to localize this thing anyway.  Its not yet ready for that!
+--	Now I see OBS helper calls that probably enable this to work - well, dunno if
+--	anyone will want to localize this thing anyway.
 --
 function loadLocaleData()
 	debugLog( 4 , "ENTER: loadLocaleData" )
@@ -1315,26 +1317,37 @@ function validateScenesPropertiesCallback( props , property , settings )
 		local itemErrCode = ""
 		local statCount  = 0
 		local itemErrTbl = {}
+		local flagStr = ""
+		local f_VT = {}
+		local f_FT = {}
+		local f_FP = {}
+		local f_RN = {}
+		local f_QT = {}
 		for i = 1,count do 
 			local bangBeg = false
 			local bangEnd = false
-			local bangCmd = false
+			flagStr = ""
+			f_VT = { flag = false , valu = 0 }									-- Image View Time ms
+			f_AF = { flag = false , valu = 0 }									-- AF Audio Fade Time ms
+			f_AP = { flag = false , valu = 0 }									-- AP Audio Fade To Percent
+			f_RN = { flag = false , valu = "" }									-- RN Random T/F
+			f_QT = { flag = false , valu = "" }									-- QT Quiet Text T/F T=Shows Text source (default), F=hide Text Source
 			local listItem = obs.obs_data_array_item(sceneNamesList, i-1)		-- getObj listItem
 			local itemString = obs.obs_data_get_string(listItem, "value")
 			debugLog( 5 , "itemString "..i..", 1 - value: "..itemString )
 			itemString = string.gsub(itemString,"^<[%a%p]+>","")				-- remove any Scene Error String
-			--debugLog( 5 , "itemString "..i..", 2 - value: "..itemString )
+			debugLog( 5 , "itemString "..i..", 2 - value: "..itemString )
 			itemString = string.gsub(itemString,"<I:%d-M:%d->","")				-- remove any Cmd Stats String
-			--debugLog( 5 , "itemString "..i..", 3 - value: "..itemString )
+			debugLog( 5 , "itemString "..i..", 3 - value: "..itemString )
 			local itemScene,partTwo = string.match(itemString,"^(.-),(.*)$")
 			if itemScene == nil then itemScene = "" end
 			if partTwo   == nil then partTwo   = "" end
-			--debugLog( 5 , "Raw 1 Matches, itemScene:"..itemScene..": partTwo:"..partTwo..":" )
+			debugLog( 5 , "Raw 1 Matches, itemScene: "..itemScene..": partTwo:"..partTwo..":" )
 			local itemCmd,nextScene = string.match(partTwo,"^(.*)(,.*)$")
 			if itemScene == nil then itemScene = ""      end
 			if itemCmd   == nil then itemCmd   = partTwo end
 			if nextScene == nil then nextScene = ""      end
-			--debugLog( 5 , "Raw 2 Matches, itemScene:"..itemScene..": itemCmd:"..itemCmd..": nextScene:"..nextScene..":" )
+			debugLog( 5 , "Raw 2 Matches, itemScene: "..itemScene..": itemCmd:"..itemCmd..": nextScene:"..nextScene..":" )
 			itemScene = string.gsub(itemScene,"%s+$","")	-- trim white space at end
 			itemScene = string.gsub(itemScene,"^%s+","")	-- trim white space at beginning
 			itemCmd   = string.gsub(itemCmd  ,"%s+$","")	-- trim white space at end
@@ -1342,6 +1355,95 @@ function validateScenesPropertiesCallback( props , property , settings )
 			nextScene = string.gsub(nextScene,"^,"  ,"")	-- Remove leading comma, its expected as part of pattern capture
 			nextScene = string.gsub(nextScene,"%s+$","")	-- trim white space at end
 			nextScene = string.gsub(nextScene,"^%s+","")	-- trim white space at beginning
+			--
+			--	Now, itemCmd could have a <> string containing flags allowing the specification of parameters that
+			--	would override the settings values. Flags (case insensitive) are:
+			--		VT:ms  - this is View Time for Image slide view duration Milliseconds
+			--		AF:ms  - this is Audio Fade Time Milliseconds
+			--		AP:%   - this is the Audio Fade To Percentage int value range:0-100
+			--		QT:t/f  - this is text dhow/hide - T=show(default), f=hide
+			--		RN:t/f  - this is random: T or F
+			--	Starting here, itemCmd is a string of the Cmd, possibly prefixed with <flag:value...>
+			--	Flags and values are NOT comma separated and spaces not allowed.
+			--	Note: Here we are only doing the parsing and some true validation and no error flagging.
+			--	Thus, users could put other junk inside the <> brackets and this code could not even see it.
+			--	But the user will not get the desired result and flagging it wouold be lots of work and probably ugly
+			--	It is bad enough that this takes a lot of character space in the line of text, itself being ugly
+			--
+			flagStr = string.match( itemCmd , "^%s-(<.->)%s-")			-- extract the flags part of the string
+			if flagStr == nil then flagStr = "" end
+			itemCmd = string.gsub ( itemCmd , "^%s-<.->%s-" , "" )		-- remove the flags item, leaving only the CMD
+			itemCmd = string.gsub(itemCmd  ,"^%s+","")					-- trim white space at beginning
+			debugLog( 5 , "flagStr:"..tostring(flagStr)..", itemCmd:"..itemCmd..":")
+			--
+			--	What is most important here is that the flagStr match be removed from the CMD for CMD testing etc.
+			--
+			if flagStr ~= nil and flagStr ~= "" then
+				flagStr = string.upper(flagStr)
+				-- If a match occurs, that .flag value will not be nil, therefore is TRUE
+				-- If no match, flag is nil - therefore false
+				-- If a match occurs, we initially trust the value capture part of the match.
+				f_VT.flag, f_VT.valu = string.match( flagStr , "(VT:)(%d+)"  )		-- To match, must be zero or positive
+				f_AF.flag, f_AF.valu = string.match( flagStr , "(AF:)(%d+)"  )		-- To match, must be zero or positive
+				f_AP.flag, f_AP.valu = string.match( flagStr , "(AP:)(%d+)"  )		-- To match, must be zero or positive
+				f_RN.flag, f_RN.valu = string.match( flagStr , "(RN:)([TF10])" )	-- To match, must be T, F, 1 or 0
+				f_QT.flag, f_QT.valu = string.match( flagStr , "(QT:)([TF10])" )	-- To match, must be T, F, 1 or 0
+				--
+				debugLog( 5 , "f_VT.flag:"..tostring(f_VT.flag)..", f_VT.valu:"..tostring(f_VT.valu)..":" )
+				debugLog( 5 , "f_AF.flag:"..tostring(f_AF.flag)..", f_AF.valu:"..tostring(f_AF.valu)..":" )
+				debugLog( 5 , "f_AP.flag:"..tostring(f_AP.flag)..", f_AP.valu:"..tostring(f_AP.valu)..":" )
+				debugLog( 5 , "f_RN.flag:"..tostring(f_RN.flag)..", f_RN.valu:"..tostring(f_RN.valu)..":" )
+				debugLog( 5 , "f_QT.flag:"..tostring(f_QT.flag)..", f_QT.valu:"..tostring(f_QT.valu)..":" )
+				--
+				if f_VT.flag then
+					if tonumber(f_VT.valu) <= 0 then
+						f_VT.flag = false							-- a ZERO Image View Time is not good - cancel it
+						f_VT.valu = 0
+					else
+						f_VT.valu = tonumber(f_VT.valu)				-- make this a number
+					end
+				end
+				--		We accept any Audio Fade Time value desired from zero to positive anything
+				if f_AF.flag then
+					f_AF.valu = tonumber(f_AF.valu)					-- make this a number
+				end
+				--
+				if f_AP.flag then
+					if tonumber(f_AP.valu) > 100 then
+						f_AP.flag = false							-- a Audio Fade Percentage > 100 is illegal - cancel it
+						f_AP.valu = 0
+					else
+						f_AP.valu = tonumber(f_AP.valu)				-- make this a number
+					end
+				end
+				if f_RN.flag then
+					-- based on the nature of the matching, valu is any 1 of the allowed characters.
+					-- make the valu a proper bool
+					if f_RN.valu == "T" or f_RN.valu == "1" then
+						f_RN.valu = true
+					else
+						f_RN.valu = false
+					end
+				end
+				if f_QT.flag then
+					-- based on the nature of the matching, valu is any 1 of the allowed characters.
+					-- make the valu a proper bool
+					if f_QT.valu == "T" or f_QT.valu == "1" then
+						f_QT.valu = true
+					else
+						f_QT.valu = false
+					end
+				end
+				--	Now nicely reformat the flagStr to what we think we got.  Any junk from the user would then be gone.
+				--	If the user notices this, perhaps they might spot mistakes... sigh...
+				local nuFlagStr = ""
+				if  f_VT.flag  then  nuFlagStr = nuFlagStr.."VT:"..f_VT.valu      end
+				if  f_AF.flag  then  nuFlagStr = nuFlagStr.."AF:"..f_AF.valu      end
+				if  f_AP.flag  then  nuFlagStr = nuFlagStr.."AP:"..f_AP.valu      end
+				if  f_RN.flag  then  nuFlagStr = nuFlagStr.."RN:"..tf(f_RN.valu)  end
+				if  f_QT.flag  then  nuFlagStr = nuFlagStr.."QT:"..tf(f_QT.valu)  end
+				flagStr = "<"..nuFlagStr..">"
+			end
 			--
 			validScene = false
 			validNextScene = false
@@ -1356,15 +1458,6 @@ function validateScenesPropertiesCallback( props , property , settings )
 					-- Okay, so we got a bangChr - only validating in this function.
 					itemScene = iScene
 					bangBeg = true
-				end
-				-- Now, check the itemCmd to see if it is prefixed with the bang
-				-- This is intended to inhibit test display of filespecs during this show
-				-- Think of it as the Quiet tag for filespecs
-				local bangChr,iCmd = string.match(itemCmd,"^(!?)(.*)$")
-				if bangChr ~= nil and bangChr == "!" then
-					-- Okay, so we got a bangChr - only validating in this function.
-					itemCmd = iCmd
-					bangCmd = true
 				end
 				--	Now check the nextScene for presence, either alone or attached/prefixed to next-scene
 				local bangChr,nScene = string.match(nextScene,"^(!?)(.*)$")
@@ -1433,8 +1526,8 @@ function validateScenesPropertiesCallback( props , property , settings )
 					end
 					if bangBeg then newString = newString .. "!" end
 					newString = newString .. itemScene.." , "
-					if bangCmd then
-						newString = newString .. "!"
+					if flagStr ~= nil and flagStr ~= "" then
+						newString = newString .. flagStr.." "
 					end
 					newString = newString .. itemCmd.." "..stats
 					if nextScene ~= "" or bangEnd then
@@ -1483,14 +1576,25 @@ function getMediaCmdDataBySceneName( argSceneName )
 	local rtnScene  = ""
 	local rtnCmd    = ""
 	local rtnNext   = ""
-	local rtnRecCtl = { begSceneBegRecord = false , endSceneEndRecord = false }
+	local rtnRecCtl = { begSceneBegRecord = false , endSceneEndRecord = false , QT={} , RN={} , VT={} , AF={} , AP={} }
 	local gotEntry  = false
 	local begSceneBang = false
 	local nxtSceneBang = false
-	local cmdSceneBang = false
+	local flagStr = ""
+	local f_VT = { flag = false , valu = 0 }									-- Image View Time ms
+	local f_AF = { flag = false , valu = 0 }									-- AF Audio Fade Time ms
+	local f_AP = { flag = false , valu = 0 }									-- AP Audio Fade To Percent
+	local f_RN = { flag = false , valu = "" }									-- RN Random T/F
+	local f_QT = { flag = false , valu = "" }									-- QT Quiet Text T/F T=Shows Text source (default), F=hide Text Source
 	if count > 0 then
 		repeat
 			passCount = passCount + 1
+			flagStr = ""
+			f_VT = { flag = false , valu = 0 }									-- Image View Time ms
+			f_AF = { flag = false , valu = 0 }									-- AF Audio Fade Time ms
+			f_AP = { flag = false , valu = 0 }									-- AP Audio Fade To Percent
+			f_RN = { flag = false , valu = "" }									-- RN Random T/F
+			f_QT = { flag = false , valu = "" }									-- QT Quiet Text T/F T=Shows Text source (default), F=hide Text Source
 			for i = 1,count do 
 				local listItem = obs.obs_data_array_item(sceneNamesList, i-1)		-- getObj listItem
 				local itemString = obs.obs_data_get_string(listItem, "value")
@@ -1516,22 +1620,106 @@ function getMediaCmdDataBySceneName( argSceneName )
 					--	Got a line with all fields extracted and cleaned.
 					--	But do we have a line that we want?
 					--
+					--	Now, itemCmd could have a <> string containing flags allowing the specification of parameters that
+					--	would override the settings values. Flags (case insensitive) are:
+					--		VT:ms  - this is View Time for Image slide view duration Milliseconds
+					--		AF:ms  - this is Audio Fade Time Milliseconds
+					--		AP:%   - this is the Audio Fade To Percentage int value range:0-100
+					--		TQ:t/f  - this is text dhow/hide - T=show(default), f=hide
+					--		RN:t/f  - this is random: T or F
+					--	Starting here, itemCmd is a string of the Cmd, possibly prefixed with <flag:value...>
+					--	Flags and values are NOT comma separated and spaces not allowed.
+					--	Flags present ought be formatted by the validation code so that we can supposedly trust what we get.
+					--
+					flagStr = string.match( itemCmd , "^%s-(<.->)%s-")			-- extract the flags part of the string
+					if flagStr == nil then flagStr = "" end
+					itemCmd = string.gsub ( itemCmd , "^%s-<.->%s-" , "" )		-- remove the flags item, leaving only the CMD
+					itemCmd = string.gsub(itemCmd  ,"^%s+","")					-- trim white space at beginning
+					--
+					--	What is most important here is that the flagStr match be removed from the CMD for CMD testing etc.
+					--
+					if flagStr ~= nil and flagStr ~= "" then
+						flagStr = string.upper(flagStr)
+						-- If a match occurs, that .flag value will not be nil, therefore is TRUE
+						-- If no match, flag is nil - therefore false
+						-- If a match occurs, we initially trust the value capture part of the match.
+						f_VT.flag, f_VT.valu = string.match( flagStr , "(VT:)(%d+)"  )		-- To match, must be zero or positive
+						f_AF.flag, f_AF.valu = string.match( flagStr , "(AF:)(%d+)"  )		-- To match, must be zero or positive
+						f_AP.flag, f_AP.valu = string.match( flagStr , "(AP:)(%d+)"  )		-- To match, must be zero or positive
+						f_RN.flag, f_RN.valu = string.match( flagStr , "(RN:)([TF10])" )	-- To match, must be T, F, 1 or 0
+						f_QT.flag, f_QT.valu = string.match( flagStr , "(QT:)([TF10])" )	-- To match, must be T, F, 1 or 0
+						if f_VT.flag then
+							if tonumber(f_VT.valu) <= 0 then
+								f_VT.flag = false							-- a ZERO Image View Time is not good - cancel it
+								f_VT.valu = 0
+							else
+								f_VT.valu = tonumber(f_VT.valu)
+							end
+						else
+							f_VT.flag = false								-- in case of nil, make it false proper
+							f_VT.valu = 0
+						end
+						--		We accept any Audio Fade Time value desired from zero to positive anything
+						if f_AF.flag then
+							f_AF.valu = tonumber(f_AF.valu)					-- make a number
+						else
+							f_AF.flag = false								-- in case of nil, make it false proper
+							f_AF.valu = 0
+						end
+						if f_AP.flag then
+							if tonumber(f_AP.valu) > 100 then
+								f_AP.flag = false							-- a Audio Fade Percentage > 100 is illegal - cancel it
+								f_AP.valu = 0
+							else
+								f_AP.valu = tonumber(f_AP.valu)				-- make a number
+							end
+						else
+							f_AP.flag = false								-- in case of nil, make it false proper
+							f_AP.valu = 0
+						end
+						if f_RN.flag then
+							-- based on the nature of the matching, valu is any 1 of the allowed characters.
+							-- make the valu a proper bool
+							if f_RN.valu == "T" or f_RN.valu == "1" then
+								f_RN.valu = true
+							else
+								f_RN.valu = false
+							end
+						else
+							f_RN.flag = false								-- in case of nil, make it false proper
+							f_RN.valu = false
+						end
+						if f_QT.flag then
+							-- based on the nature of the matching, valu is any 1 of the allowed characters.
+							-- make the valu a proper bool
+							if f_QT.valu == "T" or f_QT.valu == "1" then
+								f_QT.valu = true
+							else
+								f_QT.valu = false
+							end
+						else
+							f_QT.flag = false								-- in case of nil, make it false proper
+							f_QT.valu = false
+						end
+						--	Now nicely reformat the flagStr to what we think we got.  Any junk from the user would then be gone.
+						--	If the user notices this, perhaps they might spot mistakes... sigh...
+						--	Ought not really have to do all these reformat things etc. Again, all was formatted in validation code etc.
+						local nuFlagStr = ""
+						if  f_VT.flag  then  nuFlagStr = nuFlagStr.."VT:"..f_VT.valu      end
+						if  f_AF.flag  then  nuFlagStr = nuFlagStr.."AF:"..f_AF.valu      end
+						if  f_AP.flag  then  nuFlagStr = nuFlagStr.."AP:"..f_AP.valu      end
+						if  f_RN.flag  then  nuFlagStr = nuFlagStr.."RN:"..tf(f_RN.valu)  end
+						if  f_QT.flag  then  nuFlagStr = nuFlagStr.."QT:"..tf(f_QT.valu)  end
+						flagStr = "<"..nuFlagStr..">"
+					end
 					--	Now check itemScene for presence of the prefixed Recording Control Character !
 					begSceneBang = false
 					nxtSceneBang = false
-					cmdSceneBang = false
 					local bangChr,iScene = string.match(itemScene,"^(!?)(.*)$")
 					if bangChr ~= nil and bangChr == "!" then
 						-- Okay, so we got a bangChr - only validating in this function.
 						begSceneBang = true
 						itemScene = iScene
-					end
-					-- Now check if the Cmd is prefixed with a bang or not
-					local bangChr,iCmd = string.match(itemCmd,"^(!?)(.*)$")
-					if bangChr ~= nil and bangChr == "!" then
-						-- Okay, so we got a bangChr - only validating in this function.
-						cmdSceneBang = true
-						itemCmd = iCmd
 					end
 					--	Now check the nextScene for presence, either alone or attached/prefixed to next-scene
 					local bangChr,nScene = string.match(nextScene,"^(!?)(.*)$")
@@ -1552,8 +1740,24 @@ function getMediaCmdDataBySceneName( argSceneName )
 							rtnScene = itemScene
 							rtnCmd   = itemCmd
 							rtnNext  = nextScene
-							rtnRecCtl = { begSceneBegRecord = begSceneBang , endSceneEndRecord = nxtSceneBang , cmdTextQuiet = cmdSceneBang }
-							debugLog( 5 , "P:1, Got Scene:"..rtnScene..":, begRecCtl:"..sfbool(begSceneBang)..", endRecCtl:"..sfbool(nxtSceneBang)..", cmdTextQuiet:"..sfbool(cmdSceneBang) )
+							rtnRecCtl = { begSceneBegRecord = begSceneBang , endSceneEndRecord = nxtSceneBang ,QT={},RN={},VT={},AF={},AP={}}
+							rtnRecCtl.QT.flag = f_QT.flag
+							rtnRecCtl.QT.valu = f_QT.valu
+							rtnRecCtl.RN.flag = f_RN.flag
+							rtnRecCtl.RN.valu = f_RN.valu
+							rtnRecCtl.VT.flag = f_VT.flag
+							rtnRecCtl.VT.valu = f_VT.valu
+							rtnRecCtl.AF.flag = f_AF.flag
+							rtnRecCtl.AF.valu = f_AF.valu
+							rtnRecCtl.AP.flag = f_AP.flag
+							rtnRecCtl.AP.valu = f_AP.valu
+							local msg = "P:1, Scene:"..rtnScene..":, beg:"..tf(begSceneBang)..", end:"..tf(nxtSceneBang)..",flagStr="..flagStr
+							msg = msg .. ",QT:"..tostring(rtnRecCtl.QT.flag)..tf(rtnRecCtl.QT.valu)
+							msg = msg .. ",RN:"..tostring(rtnRecCtl.RN.flag)..tf(rtnRecCtl.RN.valu)
+							msg = msg .. ",VT:"..tostring(rtnRecCtl.VT.flag)..rtnRecCtl.VT.valu..":"
+							msg = msg .. ",AF:"..tostring(rtnRecCtl.AF.flag)..rtnRecCtl.AF.valu..":"
+							msg = msg .. ",AP:"..tostring(rtnRecCtl.AP.flag)..rtnRecCtl.AP.valu..":"
+							debugLog( 5 , msg )
 							gotEntry = true
 							break
 						end
@@ -1563,9 +1767,49 @@ function getMediaCmdDataBySceneName( argSceneName )
 							rtnScene = "default"
 							rtnCmd   = itemCmd
 							rtnNext  = nextScene
-							rtnRecCtl = { begSceneBegRecord = begSceneBang , endSceneEndRecord = nxtSceneBang , cmdTextQuiet = cmdSceneBang }
-							debugLog( 5 , "P:2, Got Scene:"..rtnScene..":, begRecCtl:"..sfbool(begSceneBang)..", endRecCtl:"..sfbool(nxtSceneBang)..", cmdTextQuiet:"..sfbool(cmdSceneBang) )
+							rtnRecCtl = { begSceneBegRecord = begSceneBang , endSceneEndRecord = nxtSceneBang ,QT={},RN={},VT={},AF={},AP={}}
+							rtnRecCtl.QT.flag = f_QT.flag
+							rtnRecCtl.QT.valu = f_QT.valu
+							rtnRecCtl.RN.flag = f_RN.flag
+							rtnRecCtl.RN.valu = f_RN.valu
+							rtnRecCtl.VT.flag = f_VT.flag
+							rtnRecCtl.VT.valu = f_VT.valu
+							rtnRecCtl.AF.flag = f_AF.flag
+							rtnRecCtl.AF.valu = f_AF.valu
+							rtnRecCtl.AP.flag = f_AP.flag
+							rtnRecCtl.AP.valu = f_AP.valu
+							local msg = "P:1, Scene:"..rtnScene..":, beg:"..sfbool(begSceneBang)..", end:"..sfbool(nxtSceneBang)..",flagStr="..flagStr
+							msg = msg .. ",QT:"..tostring(rtnRecCtl.QT.flag)..tf(rtnRecCtl.QT.valu)
+							msg = msg .. ",RN:"..tostring(rtnRecCtl.RN.flag)..tf(rtnRecCtl.RN.valu)
+							msg = msg .. ",VT:"..tostring(rtnRecCtl.VT.flag)..rtnRecCtl.VT.valu..":"
+							msg = msg .. ",AF:"..tostring(rtnRecCtl.AF.flag)..rtnRecCtl.AF.valu..":"
+							msg = msg .. ",AP:"..tostring(rtnRecCtl.AP.flag)..rtnRecCtl.AP.valu..":"
+							debugLog( 5 , msg )
 							gotEntry = true
+							break
+						else
+							-- nope, 1st pass failed to find named scene and no default
+							rtnScene = ""
+							rtnCmd   = ""
+							rtnNext  = ""
+							rtnRecCtl = { begSceneBegRecord = false , endSceneEndRecord = false ,QT={},RN={},VT={},AF={},AP={}}
+							rtnRecCtl.QT.flag = false
+							rtnRecCtl.QT.valu = false
+							rtnRecCtl.RN.flag = false
+							rtnRecCtl.RN.valu = false
+							rtnRecCtl.VT.flag = false
+							rtnRecCtl.VT.valu = 0
+							rtnRecCtl.AF.flag = false
+							rtnRecCtl.AF.valu = 0
+							rtnRecCtl.AP.flag = false
+							rtnRecCtl.AP.valu = 0
+							local msg = "P:1, Scene:"..rtnScene..":, beg:"..sfbool(begSceneBang)..", end:"..sfbool(nxtSceneBang)..",flagStr="..flagStr
+							msg = msg .. ",QT:"..tostring(rtnRecCtl.QT.flag)..tf(rtnRecCtl.QT.valu)
+							msg = msg .. ",RN:"..tostring(rtnRecCtl.RN.flag)..tf(rtnRecCtl.RN.valu)
+							msg = msg .. ",VT:"..tostring(rtnRecCtl.VT.flag)..rtnRecCtl.VT.valu..":"
+							msg = msg .. ",AF:"..tostring(rtnRecCtl.AF.flag)..rtnRecCtl.AF.valu..":"
+							msg = msg .. ",AP:"..tostring(rtnRecCtl.AP.flag)..rtnRecCtl.AP.valu..":"
+							debugLog( 5 , msg )
 							break
 						end
 					end
@@ -1578,10 +1822,25 @@ function getMediaCmdDataBySceneName( argSceneName )
 		rtnScene = ""
 		rtnCmd   = ""
 		rtnNext  = ""
-		rtnRecCtl = { begSceneBegRecord = false , endSceneEndRecord = false }
+		rtnRecCtl = { begSceneBegRecord = false , endSceneEndRecord = false ,QT={},RN={},VT={},AF={},AP={}}
+		rtnRecCtl.QT.flag = false
+		rtnRecCtl.QT.valu = false
+		rtnRecCtl.RN.flag = false
+		rtnRecCtl.RN.valu = false
+		rtnRecCtl.VT.flag = false
+		rtnRecCtl.VT.valu = 0
+		rtnRecCtl.AF.flag = false
+		rtnRecCtl.AF.valu = 0
+		rtnRecCtl.AP.flag = false
+		rtnRecCtl.AP.valu = 0
 	end
 	obs.obs_data_array_release(sceneNamesList)										-- release sceneNamesList
-	local xtra = "Ctl.beg:"..tf(rtnRecCtl.begSceneBegRecord)..", end:"..tf(rtnRecCtl.endSceneEndRecord)..", Quiet:"..tf(rtnRecCtl.cmdTextQuiet)
+	local xtra = "Ctl.beg:"..tf(rtnRecCtl.begSceneBegRecord)..", end:"..tf(rtnRecCtl.endSceneEndRecord)
+	xtra = xtra .. ",QT:"..tostring(rtnRecCtl.QT.flag)..tf(rtnRecCtl.QT.valu)
+	xtra = xtra .. ",RN:"..tostring(rtnRecCtl.RN.flag)..tf(rtnRecCtl.RN.valu)
+	xtra = xtra .. ",VT:"..tostring(rtnRecCtl.VT.flag)..rtnRecCtl.VT.valu..":"
+	xtra = xtra .. ",AF:"..tostring(rtnRecCtl.AF.flag)..rtnRecCtl.AF.valu..":"
+	xtra = xtra .. ",AP:"..tostring(rtnRecCtl.AP.flag)..rtnRecCtl.AP.valu..":"
 	debugLog( 4 , "LEAVE: getMediaCmdDataBySceneName, rtnScene:"..rtnScene..": nxtScene:"..rtnNext..": "..xtra..": rtnCmd:"..rtnCmd )
 	return rtnScene, rtnCmd, rtnNext, rtnRecCtl
 end
@@ -1777,6 +2036,7 @@ function script_defaults(settings)
 	obs.obs_data_set_default_int   (settings, "BgAudioCutPercent" , 80 )
 	obs.obs_data_set_default_int   (settings, "BgAudioFadeTime"   , 1500 )
 	obs.obs_data_set_default_bool  (settings, "DebugLogEnabled"   , false )
+	obs.obs_data_set_default_bool  (settings, "RandomizeShow"     , false )
 	obs.obs_data_set_default_int   (settings, "FolderTrimLevel"   , 1 )
 	obs.obs_data_set_default_bool  (settings, "FolderTrimOnLeft"  , true )
 	obs.obs_data_set_default_int   (settings, "DebugLogLevel"     , 1 )
@@ -2048,138 +2308,133 @@ function getNextMediaItem()
 end
 --
 --	Function to service callbacks for events that occur in the frontend.
---	Will look at this more in future.  But seems like all these constants
---	are not defined???  Thus, what numeric value is event???  There ought
---	be a getter that lists the values and also to get the event constant
---	text name or some such thing.  Gotta work with stock OBS install.
+--	Will look at this more in future.
 --	Nothing needed here for SMSS yet anyway.
 --
 function onEventCallback(event)
-	debugLog( 5 , "ENTER: onEventCallback - event: "..event )
-	--if event == OBS.OBS_FRONTEND_EVENT_STREAMING_STARTING then
-	--	debugLog( 4 , "Triggered when streaming is starting." )
-	--end
-	--if event == OBS.OBS_FRONTEND_EVENT_STREAMING_STARTED then
-	--	debugLog( 4 , "Triggered when streaming has successfully started." )
-	--end
-	--if event == OBS.OBS_FRONTEND_EVENT_STREAMING_STOPPING then
-	--	debugLog( 4 , "Triggered when streaming is stopping." )
-	--end
-	--if event == OBS.OBS_FRONTEND_EVENT_STREAMING_STOPPED then
-	--	debugLog( 4 , "Triggered when streaming has fully stopped." )
-	--end
-	--if event == OBS.OBS_FRONTEND_EVENT_RECORDING_STARTING then
-	--	debugLog( 4 , "Triggered when recording is starting." )
-	--end
-	--if event == OBS.OBS_FRONTEND_EVENT_RECORDING_STARTED then
-	--	debugLog( 4 , "Triggered when recording has successfully started." )
-	--end
-	--if event == OBS.OBS_FRONTEND_EVENT_RECORDING_STOPPING then
-	--	debugLog( 4 , "Triggered when recording is stopping." )
-	--end
-	--if event == OBS.OBS_FRONTEND_EVENT_RECORDING_STOPPED then
-	--	debugLog( 4 , "Triggered when recording has fully stopped." )
-	--end
-	--if event == OBS.OBS_FRONTEND_EVENT_RECORDING_PAUSED then
-	--	debugLog( 4 , "Triggered when the recording has been paused." )
-	--end
-	--if event == OBS.OBS_FRONTEND_EVENT_RECORDING_UNPAUSED then
-	--	debugLog( 4 , "Triggered when the recording has been unpaused." )
-	--end
-	--if event == OBS.OBS_FRONTEND_EVENT_SCENE_CHANGED then
-	--	debugLog( 4 , "Triggered when the current scene has changed." )
-	--end
-	--if event == OBS.OBS_FRONTEND_EVENT_SCENE_LIST_CHANGED then
-	--	debugLog( 4 , "Triggered when a scenes has been added/removed/reordered by the user." )
-	--end
-	--if event == OBS.OBS_FRONTEND_EVENT_TRANSITION_CHANGED then
-	--	debugLog( 4 , "Triggered when the current transition has changed by the user." )
-	--end
-	--if event == OBS.OBS_FRONTEND_EVENT_TRANSITION_STOPPED then
-	--	debugLog( 4 , "Triggered when a transition has completed." )
-	--end
-	--if event == OBS.OBS_FRONTEND_EVENT_TRANSITION_LIST_CHANGED then
-	--	debugLog( 4 , "Triggered when the user adds/removes transitions." )
-	--end
-	--if event == OBS.OBS_FRONTEND_EVENT_TRANSITION_DURATION_CHANGED then
-	--	debugLog( 4 , "Triggered when the transition duration has been changed by the user." )
-	--end
-	--if event == OBS.OBS_FRONTEND_EVENT_TBAR_VALUE_CHANGED then
-	--	debugLog( 4 , "Triggered when the transition bar is moved." )
-	--end
-	--if event == OBS.OBS_FRONTEND_EVENT_SCENE_COLLECTION_CHANGING then
-	--	debugLog( 4 , "Triggered when the current scene collection is about to change." )
-	--end
-	--if event == OBS.OBS_FRONTEND_EVENT_SCENE_COLLECTION_CHANGED then
-	--	debugLog( 4 , "Triggered when the current scene collection has changed." )
-	--end
-	--if event == OBS.OBS_FRONTEND_EVENT_SCENE_COLLECTION_LIST_CHANGED then
-	--	debugLog( 4 , "Triggered when a scene collection has been added or removed." )
-	--end
-	--if event == OBS.OBS_FRONTEND_EVENT_SCENE_COLLECTION_RENAMED then
-	--	debugLog( 4 , "Triggered when a scene collection has been renamed." )
-	--end
-	--if event == OBS.OBS_FRONTEND_EVENT_PROFILE_CHANGING then
-	--	debugLog( 4 , "Triggered when the current profile is about to change." )
-	--end
-	--if event == OBS.OBS_FRONTEND_EVENT_PROFILE_CHANGED then
-	--	debugLog( 4 , "Triggered when the current profile has changed." )
-	--end
-	--if event == OBS.OBS_FRONTEND_EVENT_PROFILE_LIST_CHANGED then
-	--	debugLog( 4 , "Triggered when a profile has been added or removed." )
-	--end
-	--if event == OBS.OBS_FRONTEND_EVENT_PROFILE_RENAMED then
-	--	debugLog( 4 , "Triggered when a profile has been renamed." )
-	--end
-	--if event == OBS.OBS_FRONTEND_EVENT_FINISHED_LOADING then
-	--	debugLog( 4 , "Triggered when the program has finished loading." )
-	--end
-	--if event == OBS.OBS_FRONTEND_EVENT_SCRIPTING_SHUTDOWN then
-	--	local txt = "Triggered when scripts need to know that OBS is exiting. The "
-	--	txt = txt .."OBS_FRONTEND_EVENT_EXIT event is normally called after scripts "
-	--	txt = txt .."have been destroyed."
-	--	debugLog( 4 , txt )
-	--end
-	--if event == OBS.OBS_FRONTEND_EVENT_EXIT then
-	--	debugLog( 4 , "Triggered when the program is about to exit." )
-	--end
-	--if event == OBS.OBS_FRONTEND_EVENT_REPLAY_BUFFER_STARTING then
-	--	debugLog( 4 , "Triggered when the replay buffer is starting." )
-	--end
-	--if event == OBS.OBS_FRONTEND_EVENT_REPLAY_BUFFER_STARTED then
-	--	debugLog( 4 , "Triggered when the replay buffer has successfully started." )
-	--end
-	--if event == OBS.OBS_FRONTEND_EVENT_REPLAY_BUFFER_STOPPING then
-	--	debugLog( 4 , "Triggered when the replay buffer is stopping." )
-	--end
-	--if event == OBS.OBS_FRONTEND_EVENT_REPLAY_BUFFER_STOPPED then
-	--	debugLog( 4 , "Triggered when the replay buffer has fully stopped." )
-	--end
-	--if event == OBS.OBS_FRONTEND_EVENT_REPLAY_BUFFER_SAVED then
-	--	debugLog( 4 , "Triggered when the replay buffer has been saved." )
-	--end
-	--if event == OBS.OBS_FRONTEND_EVENT_STUDIO_MODE_ENABLED then
-	--	debugLog( 4 , "Triggered when the user has turned on studio mode." )
-	--end
-	--if event == OBS.OBS_FRONTEND_EVENT_STUDIO_MODE_DISABLED then
-	--	debugLog( 4 , "Triggered when the user has turned off studio mode." )
-	--end
-	--if event == OBS.OBS_FRONTEND_EVENT_PREVIEW_SCENE_CHANGED then
-	--	debugLog( 4 , "Triggered when the current preview scene has changed in studio mode." )
-	--end
-	--if event == OBS.OBS_FRONTEND_EVENT_SCENE_COLLECTION_CLEANUP then
-	--	local txt = "Triggered when a scene collection has been completely unloaded, "
-	--	txt = txt .."and the program is either about to load a new scene collection, "
-	--	txt = txt .."or the program is about to exit."
-	--	debugLog( 4 , txt )
-	--end
-	--if event == OBS.OBS_FRONTEND_EVENT_VIRTUALCAM_STARTED then
-	--	debugLog( 4 , "Triggered when the virtual camera is started." )
-	--end
-	--if event == OBS.OBS_FRONTEND_EVENT_VIRTUALCAM_STOPPED then
-	--	debugLog( 4 , "Triggered when the virtual camera is stopped." )
-	--end
-	debugLog( 5 , "LEAVE: onEventCallback")
+	debugLog( 4 , "ENTER: onEventCallback - event: "..event )
+	if event == obs.OBS_FRONTEND_EVENT_STREAMING_STARTING then
+		debugLog( 4 , "Triggered when streaming is starting." )
+	end
+	if event == obs.OBS_FRONTEND_EVENT_STREAMING_STARTED then
+		debugLog( 4 , "Triggered when streaming has successfully started." )
+	end
+	if event == obs.OBS_FRONTEND_EVENT_STREAMING_STOPPING then
+		debugLog( 4 , "Triggered when streaming is stopping." )
+	end
+	if event == obs.OBS_FRONTEND_EVENT_STREAMING_STOPPED then
+		debugLog( 4 , "Triggered when streaming has fully stopped." )
+	end
+	if event == obs.OBS_FRONTEND_EVENT_RECORDING_STARTING then
+		debugLog( 4 , "Triggered when recording is starting." )
+	end
+	if event == obs.OBS_FRONTEND_EVENT_RECORDING_STARTED then
+		debugLog( 4 , "Triggered when recording has successfully started." )
+	end
+	if event == obs.OBS_FRONTEND_EVENT_RECORDING_STOPPING then
+		debugLog( 4 , "Triggered when recording is stopping." )
+	end
+	if event == obs.OBS_FRONTEND_EVENT_RECORDING_STOPPED then
+		debugLog( 4 , "Triggered when recording has fully stopped." )
+	end
+	if event == obs.OBS_FRONTEND_EVENT_RECORDING_PAUSED then
+		debugLog( 4 , "Triggered when the recording has been paused." )
+	end
+	if event == obs.OBS_FRONTEND_EVENT_RECORDING_UNPAUSED then
+		debugLog( 4 , "Triggered when the recording has been unpaused." )
+	end
+	if event == obs.OBS_FRONTEND_EVENT_SCENE_CHANGED then
+		debugLog( 4 , "Triggered when the current scene has changed." )
+	end
+	if event == obs.OBS_FRONTEND_EVENT_SCENE_LIST_CHANGED then
+		debugLog( 4 , "Triggered when a scenes has been added/removed/reordered by the user." )
+	end
+	if event == obs.OBS_FRONTEND_EVENT_TRANSITION_CHANGED then
+		debugLog( 4 , "Triggered when the current transition has changed by the user." )
+	end
+	if event == obs.OBS_FRONTEND_EVENT_TRANSITION_STOPPED then
+		debugLog( 4 , "Triggered when a transition has completed." )
+	end
+	if event == obs.OBS_FRONTEND_EVENT_TRANSITION_LIST_CHANGED then
+		debugLog( 4 , "Triggered when the user adds/removes transitions." )
+	end
+	if event == obs.OBS_FRONTEND_EVENT_TRANSITION_DURATION_CHANGED then
+		debugLog( 4 , "Triggered when the transition duration has been changed by the user." )
+	end
+	if event == obs.OBS_FRONTEND_EVENT_TBAR_VALUE_CHANGED then
+		debugLog( 4 , "Triggered when the transition bar is moved." )
+	end
+	if event == obs.OBS_FRONTEND_EVENT_SCENE_COLLECTION_CHANGING then
+		debugLog( 4 , "Triggered when the current scene collection is about to change." )
+	end
+	if event == obs.OBS_FRONTEND_EVENT_SCENE_COLLECTION_CHANGED then
+		debugLog( 4 , "Triggered when the current scene collection has changed." )
+	end
+	if event == obs.OBS_FRONTEND_EVENT_SCENE_COLLECTION_LIST_CHANGED then
+		debugLog( 4 , "Triggered when a scene collection has been added or removed." )
+	end
+	if event == obs.OBS_FRONTEND_EVENT_SCENE_COLLECTION_RENAMED then
+		debugLog( 4 , "Triggered when a scene collection has been renamed." )
+	end
+	if event == obs.OBS_FRONTEND_EVENT_PROFILE_CHANGING then
+		debugLog( 4 , "Triggered when the current profile is about to change." )
+	end
+	if event == obs.OBS_FRONTEND_EVENT_PROFILE_CHANGED then
+		debugLog( 4 , "Triggered when the current profile has changed." )
+	end
+	if event == obs.OBS_FRONTEND_EVENT_PROFILE_LIST_CHANGED then
+		debugLog( 4 , "Triggered when a profile has been added or removed." )
+	end
+	if event == obs.OBS_FRONTEND_EVENT_PROFILE_RENAMED then
+		debugLog( 4 , "Triggered when a profile has been renamed." )
+	end
+	if event == obs.OBS_FRONTEND_EVENT_FINISHED_LOADING then
+		debugLog( 4 , "Triggered when the program has finished loading." )
+	end
+	if event == obs.OBS_FRONTEND_EVENT_SCRIPTING_SHUTDOWN then
+		debugLog( 4 , "Triggered when scripts need to know that OBS is exiting. The " )
+		debugLog( 4 , "OBS_FRONTEND_EVENT_EXIT event is normally called after scripts " )
+		debugLog( 4 , "have been destroyed." )
+	end
+	if event == obs.OBS_FRONTEND_EVENT_EXIT then
+		debugLog( 4 , "Triggered when the program is about to exit." )
+	end
+	if event == obs.OBS_FRONTEND_EVENT_REPLAY_BUFFER_STARTING then
+		debugLog( 4 , "Triggered when the replay buffer is starting." )
+	end
+	if event == obs.OBS_FRONTEND_EVENT_REPLAY_BUFFER_STARTED then
+		debugLog( 4 , "Triggered when the replay buffer has successfully started." )
+	end
+	if event == obs.OBS_FRONTEND_EVENT_REPLAY_BUFFER_STOPPING then
+		debugLog( 4 , "Triggered when the replay buffer is stopping." )
+	end
+	if event == obs.OBS_FRONTEND_EVENT_REPLAY_BUFFER_STOPPED then
+		debugLog( 4 , "Triggered when the replay buffer has fully stopped." )
+	end
+	if event == obs.OBS_FRONTEND_EVENT_REPLAY_BUFFER_SAVED then
+		debugLog( 4 , "Triggered when the replay buffer has been saved." )
+	end
+	if event == obs.OBS_FRONTEND_EVENT_STUDIO_MODE_ENABLED then
+		debugLog( 4 , "Triggered when the user has turned on studio mode." )
+	end
+	if event == obs.OBS_FRONTEND_EVENT_STUDIO_MODE_DISABLED then
+		debugLog( 4 , "Triggered when the user has turned off studio mode." )
+	end
+	if event == obs.OBS_FRONTEND_EVENT_PREVIEW_SCENE_CHANGED then
+		debugLog( 4 , "Triggered when the current preview scene has changed in studio mode." )
+	end
+	if event == obs.OBS_FRONTEND_EVENT_SCENE_COLLECTION_CLEANUP then
+		debugLog( 4 , "Triggered when a scene collection has been completely unloaded, " )
+		debugLog( 4 , "and the program is either about to load a new scene collection, " )
+		debugLog( 4 , "or the program is about to exit." )
+	end
+	if event == obs.OBS_FRONTEND_EVENT_VIRTUALCAM_STARTED then
+		debugLog( 4 , "Triggered when the virtual camera is started." )
+	end
+	if event == obs.OBS_FRONTEND_EVENT_VIRTUALCAM_STOPPED then
+		debugLog( 4 , "Triggered when the virtual camera is stopped." )
+	end
+	debugLog( 4 , "LEAVE: onEventCallback")
 end
 --
 --	Function to show the visibility stats etc of all the sources that are used in a slideshow.
@@ -2835,7 +3090,7 @@ function timer_StopRecordAndWait_Callback()
 	debugLog( 4 , "ENTER: timer_StopRecordAndWait_Callback" )
 	obs.remove_current_callback()
 	-- 200 waits of 5ms is only a timeout max give up time of 10 seconds.
-	local maxWaitCount = 200																	-- an arbitrary max wait count, for safety
+	local maxWaitCount = 400																	-- an arbitrary max wait count, for safety
 	local recordingActive = false
 	repeat
 		activeWaitingCount = activeWaitingCount + 1
@@ -2992,6 +3247,23 @@ function saveAndSetStartupStates()
 		gbl_ShowNextScene = nxtScene
 		if gbl_ShowNextScene == "!" then gbl_ShowNextScene = "" end			-- Insurance ?? the ! ought not have been here
 		gbl_SceneRecFlags = recCtl
+	end
+	--	Do all the overrides of settings here that can be done here.  TEXT is diff - see below vis set false on QT=T valu
+	if gbl_SceneRecFlags.VT.flag then									-- Override settings Image View Period
+		prmPicDelayPeriod = gbl_SceneRecFlags.VT.valu
+		debugLog( 3 , "saveAndSetStartupStates - Override Settings PicDelayPeriod: "..prmPicDelayPeriod )
+	end
+	if gbl_SceneRecFlags.AF.flag then									-- Override settings Fade Time
+		prmBgAudioFadeTime = gbl_SceneRecFlags.AF.valu
+		debugLog( 3 , "saveAndSetStartupStates - Override Settings Bg Audio Fade Time: "..prmBgAudioFadeTime )
+	end
+	if gbl_SceneRecFlags.AP.flag then									-- Override settings Cut To Percent 
+		prmBgAudioCutPercent = gbl_SceneRecFlags.AP.valu
+		debugLog( 3 , "saveAndSetStartupStates - Override Settings Bg Audio Cut to Percent: "..prmBgAudioCutPercent )
+	end
+	if gbl_SceneRecFlags.RN.flag then									-- Override settings Randomize Show
+		prmRandomizeShow = gbl_SceneRecFlags.RN.valu
+		debugLog( 3 , "saveAndSetStartupStates - Override Settings Randomize Show: "..sfbool(prmRandomizeShow) )
 	end
 	--
 	-- Find and attach visibility signal handler for the prmShowControlGroup
@@ -3239,8 +3511,12 @@ function saveAndSetStartupStates()
 		prmSourceNames.prmTargetTextSource.beginItemValue = getSourceSetting( prmTargetTextSource , "text" , "string" )
 		--	And now change its settings text value to nothing.
 		changeSourceSetting ( prmTargetTextSource , "text" , "" , "string" )
-		if gbl_SceneRecFlags.cmdTextQuiet then
-			obs.obs_sceneitem_set_visible( prmSourceNames.prmTargetTextSource.sceneItemObj , false )
+		--
+		if gbl_SceneRecFlags.QT.flag then									-- Override/force TEXT source to be quiet this show
+			if gbl_SceneRecFlags.QT.valu then								-- so then we make it not visible
+				obs.obs_sceneitem_set_visible( prmSourceNames.prmTargetTextSource.sceneItemObj , false )
+				debugLog( 3 , "saveAndSetStartupStates - Override/Force TEXT Source to be Quiet this show, make invisible." )
+			end
 		end
 	end
 	--
