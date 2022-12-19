@@ -1,4 +1,7 @@
 # SuperMediaSlideShow
+
+1.7.1 Update: Fixed Settings Overrides that sometimes did not reset across shows properly.
+
 SuperMediaSlideSHow, OBS-Studio lua Automated Media Presentation System focused on Images and Videos and a enough Workflow to make a whole movie.
 
 SMSS is a lua script that drives the OBS-Studio Image and or Media source to deliver a well featured Multi-Media Slide Show like presentation. Media files are loaded from folders on your system and there is little limit to their number (thousands ought be no problem).
@@ -12,6 +15,7 @@ Features:
 * Co-exists with OBS-Studio configured Show/Hide transitions. Image visibility duration takes into consideration Image Source show/hide transition times. 
 * Optionally shows each full/partial file specification in a Text source during a show. 
 * Capable of Starting and Stopping Recording Automatically.  This feature also acts to Fade the optional Background Audio source in at recording start and fade out at recording end.
+* New in V1.7.0, Scene Flags settings allow flexible Image view times, Audio Fade times and percentages, Hide Media File Paths (text source), Randomize slides etc.
 
 All this and more. This script was developed for Linux and tested on Windows. Aside from platform specifics, it works identically on either. MacOS is expected to just work.
 
