@@ -123,7 +123,7 @@ bit = require("bit")
 --
 gbl_settings          = nil
 gbl_scriptTitle       = "SuperMediaSlideShow"
-gbl_scriptVersion     = "1.7"
+gbl_scriptVersion     = "1.7.1"
 gbl_activatedState    = false
 gbl_TickSeconds       = 0
 gbl_LoopCount         = 0
@@ -143,9 +143,13 @@ gbl_RecordWasActive   = false		-- Recording was already active when we went to s
 gbl_RecordStopping    = false		-- Recording Stopping, not yet stopped
 gbl_RecordStopped     = false		-- Recording actually completed Stop
 gbl_RecordWasInactive = false		-- Recording was already inactive when we went to stop recording.
-gbl_SceneRecFlags     = { begSceneBegRecord = false , endSceneEndRecord = false , cmdTextQuiet = false }
---	begSceneBegRecord = T - Means when this scene begins, set Bg Audio to 0, fade up Bg Audio (if defined) and start recording, waiting for them to be ready
---	endSceneEndRecord = T - Means when this scene ends,   fade Bg Audio to zero from current level, stop recording if a Next-Scene is not specified
+gbl_SceneRecFlags = { 	begSceneBegRecord=false,		-- when scene begins, set Bg Audio to 0, fade up (if defined) and start recording, waiting for ready
+						endSceneEndRecord=false,		-- when scene ends,   fade Bg Audio to 0, stop recording if a Next-Scene is not specified
+						VT={flag=false,valu=0},			-- Set/override Pic View Time      if falg=true
+						AF={flag=false,valu=0},			-- Set/override BgAudio Fade Time  if flag=true
+						AP={flag=false,valu=0},			-- Set/override Audio Fade Percent if flag=true
+						RN={flag=false,valu=false},		-- Set/override RandomizeShow      if flag=true
+						QT={flag=false,valu=false} }	-- Set/override Quiet Text view    if flag=true
 gbl_FirstSlideItem       = ""
 gbl_FirstSlideType       = 0
 gbl_FirstSlideTypeString = ""
@@ -1589,13 +1593,13 @@ function getMediaCmdDataBySceneName( argSceneName )
 	if count > 0 then
 		repeat
 			passCount = passCount + 1
-			flagStr = ""
-			f_VT = { flag = false , valu = 0 }									-- Image View Time ms
-			f_AF = { flag = false , valu = 0 }									-- AF Audio Fade Time ms
-			f_AP = { flag = false , valu = 0 }									-- AP Audio Fade To Percent
-			f_RN = { flag = false , valu = "" }									-- RN Random T/F
-			f_QT = { flag = false , valu = "" }									-- QT Quiet Text T/F T=Shows Text source (default), F=hide Text Source
 			for i = 1,count do 
+				flagStr = ""
+				f_VT = { flag = false , valu = 0 }									-- Image View Time ms
+				f_AF = { flag = false , valu = 0 }									-- AF Audio Fade Time ms
+				f_AP = { flag = false , valu = 0 }									-- AP Audio Fade To Percent
+				f_RN = { flag = false , valu = "" }									-- RN Random T/F
+				f_QT = { flag = false , valu = "" }									-- QT Quiet Text T/F T=Shows Text source (default), F=hide Text Source
 				local listItem = obs.obs_data_array_item(sceneNamesList, i-1)		-- getObj listItem
 				local itemString = obs.obs_data_get_string(listItem, "value")
 				obs.obs_data_release(listItem)										-- release listItem
@@ -3228,12 +3232,26 @@ function saveAndSetStartupStates()
 	showBegTime  = os.time() -- Now, of course
 	--
 	local returnNow = false
+	--
+	prmPicDelayPeriod    = obs.obs_data_get_int   (gbl_settings, "PictureViewTime")
+	prmBgAudioCutPercent = obs.obs_data_get_int   (gbl_settings, "BgAudioCutPercent")
+	prmBgAudioFadeTime   = obs.obs_data_get_int   (gbl_settings, "BgAudioFadeTime")
+	prmRandomizeShow     = obs.obs_data_get_bool  (gbl_settings, "RandomizeShow")
+	--
 	local msg = ""
 	if  ( prmTargetImageSource == nil or prmTargetImageSource == "" )
 	and ( prmTargetMediaSource == nil or prmTargetMediaSource == "" ) then
 		msg = "Both IMAGE and MEDIA sources are blank, at least ONE of them MUST be defined."
 		returnNow = true
 	end
+	--
+	gbl_SceneRecFlags = { 	begSceneBegRecord=false,		-- when scene begins, set Bg Audio to 0, fade up (if defined) and start recording, waiting for ready
+							endSceneEndRecord=false,		-- when scene ends,   fade Bg Audio to 0, stop recording if a Next-Scene is not specified
+							VT={flag=false,valu=0},			-- Set/override Pic View Time      if falg=true
+							AF={flag=false,valu=0},			-- Set/override BgAudio Fade Time  if flag=true
+							AP={flag=false,valu=0},			-- Set/override Audio Fade Percent if flag=true
+							RN={flag=false,valu=false},		-- Set/override RandomizeShow      if flag=true
+							QT={flag=false,valu=false} }	-- Set/override Quiet Text view    if flag=true
 	--
 	--	Ensure that the user has defined a command to collect slides or nothing is going to happen.
 	--
