@@ -1,6 +1,7 @@
 # SuperMediaSlideShow
 
 1.7.1 Update: Fixed Settings Overrides that sometimes did not reset across shows properly.
+
 1.7.2 Update: Remove stale/empty modcallback functions in script_properties that caused infinite modcallbacks on non-existent field changes that occur when no sources are yet defined.  eg: as in a new OBS setup/config.
 
 SuperMediaSlideSHow, OBS-Studio lua Automated Media Presentation System focused on Images and Videos and a enough Workflow to make a whole movie.
