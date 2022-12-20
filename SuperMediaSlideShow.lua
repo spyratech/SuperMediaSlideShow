@@ -7,6 +7,12 @@
 --	11-Dec-2022 Add support for Flags in ScenesList to allow Scene specific settings
 --              drop ! use on Media Command as replaced by Flags. Fix spellings and
 --              events function (although still unused).  Bump Version to 1.7
+--	19-Dec-2022 Fix bug where Settings Overrides were not always reseting properly.
+--				Bump version to 1.7.1
+--	19-Dec-2022	Fix bug, remove empty modcallback functions in script_properties that
+--				caused infinite modcallbacks on non-existent field changes that occur
+--				when no sources are yet defined.  eg: as in a new OBS setup/config.
+--				Bump Version to 1.7.2
 --
 --	-----------------------------------------------------------------------------------
 --	
@@ -123,7 +129,7 @@ bit = require("bit")
 --
 gbl_settings          = nil
 gbl_scriptTitle       = "SuperMediaSlideShow"
-gbl_scriptVersion     = "1.7.1"
+gbl_scriptVersion     = "1.7.2"
 gbl_activatedState    = false
 gbl_TickSeconds       = 0
 gbl_LoopCount         = 0
@@ -205,7 +211,7 @@ countTargetMediaSource = 0
 --
 prmDebugLogLevel   = 1
 prmDebugMaxLevel   = 5
-prmDebugLogEnabled = true
+prmDebugLogEnabled = false
 gbl_DLevel         = 0
 gbl_LastTime       = os.time()
 --
@@ -1185,23 +1191,23 @@ function script_properties()
 	table.insert( pda, { name="PictureViewTime"   , parms={ ptype="int" , min=500 , max=60000 , steps=50 , modCallback=nil } } )
 	table.insert( pda, { name="ShowControlGroup"  , parms={ ptype="lst" , ltype=obs.OBS_COMBO_TYPE_LIST ,
 															format=obs.OBS_COMBO_FORMAT_STRING ,
-															modCallback=function() return true end , clear=true ,
+															modCallback=nil , clear=true ,
 															listpop=listPop_ShowControlGroup  } } )
 	table.insert( pda, { name="TargetTextSource"  , parms={ ptype="lst" , ltype=obs.OBS_COMBO_TYPE_LIST ,
 															format=obs.OBS_COMBO_FORMAT_STRING ,
-															modCallback=function() return true end , clear=true ,
+															modCallback=nil , clear=true ,
 															listpop=listPop_TargetTextSource  } } )
 	table.insert( pda, { name="TargetImageSource" , parms={ ptype="lst" , ltype=obs.OBS_COMBO_TYPE_LIST ,
 															format=obs.OBS_COMBO_FORMAT_STRING ,
-															modCallback=function() return true end , clear=true ,
+															modCallback=nil , clear=true ,
 															listpop=listPop_TargetImageSource } } )
 	table.insert( pda, { name="TargetMediaSource" , parms={ ptype="lst" , ltype=obs.OBS_COMBO_TYPE_LIST ,
 															format=obs.OBS_COMBO_FORMAT_STRING ,
-															modCallback=function() return true end , clear=true ,
+															modCallback=nil , clear=true ,
 															listpop=listPop_TargetMediaSource } } )
 	table.insert( pda, { name="BgAudioFadeSource" , parms={ ptype="lst" , ltype=obs.OBS_COMBO_TYPE_LIST ,
 														    format=obs.OBS_COMBO_FORMAT_STRING ,
-															modCallback=function() return true end , clear=true ,
+															modCallback=nil , clear=true ,
 															listpop=listPop_BgAudioFadeSource } } )
 	table.insert( pda, { name="BgAudioCutPercent" , parms={ ptype="int" , min=0 , max=100   , steps=5   , modCallback=nil } } )
 	table.insert( pda, { name="BgAudioFadeTime"   , parms={ ptype="int" , min=0 , max=10000 , steps=100 , modCallback=nil } } )
